@@ -10,44 +10,33 @@ const { channel, token } = require("./config.json");
 const jsonFile = require("./futures.json");
 
 const getTrends = async () => {
-  let finalData = [];
-  let finalTickers = [];
-
-  await axios
+  const trendingList = await axios
     .get(
       `https://www.binance.com/bapi/composite/v1/public/marketing/recommend/hotAsset/list?currency=USD&type=1`
     )
-    .then((res) => {
-      res.data.data.map((item) => {
-        if (!finalData.includes(item.baseAsset)) {
-          finalData.push(item.baseAsset);
-        }
-      });
+    .then(async (res) => {
+      const trends = await Promise.all(
+        res.data.data.map(async (item) => {
+          const assets = await axios.get(
+            `https://www.binance.com/bapi/composite/v1/public/marketing/tardingPair/detail?symbol=${item.baseAsset}`
+          );
+
+          if (assets.data.data[0]) {
+            let obj = {
+              symbol: item.baseAsset,
+              marketCap: assets.data.data[0].marketCap,
+              rank: assets.data.data[0].rank,
+              circulatingSupply: assets.data.data[0].circulatingSupply,
+              totalSupply: assets.data.data[0].totalSupply,
+              dayChange: assets.data.data[0].dayChange,
+            };
+            return obj;
+          }
+        })
+      ).catch((err) => console.log(err));
+      return trends;
     })
     .catch((err) => console.log(err));
-
-  const trendingList = await Promise.all(
-    finalData.map(async (item) => {
-      return await axios
-        .get(
-          `https://www.binance.com/bapi/composite/v1/public/marketing/tardingPair/detail?symbol=${item}`
-        )
-        .then((res) => {
-          let obj = {
-            symbol: item,
-            marketCap: res.data.data[0].marketCap,
-            rank: res.data.data[0].rank,
-            circulatingSupply: res.data.data[0].circulatingSupply,
-            totalSupply: res.data.data[0].totalSupply,
-            dayChange: res.data.data[0].dayChange,
-          };
-          return obj;
-        })
-        .catch((err) => console.log(err));
-    })
-  ).catch((err) => {
-    console.log(err);
-  });
   return trendingList;
 };
 
