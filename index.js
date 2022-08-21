@@ -9,16 +9,17 @@ const { channel, token } = require("./config.json");
 // USE ANY JSON FILE OF TICKERS YOU WANT:
 const jsonFile = require("./futures.json");
 
+const BASE_URL = "https://www.binance.com/bapi/composite/v1/public/marketing";
+const HOT_ASSETS = "recommend/hotAsset/list?currency=USD&type=1";
+
 const getTrends = async () => {
   const trendingList = await axios
-    .get(
-      `https://www.binance.com/bapi/composite/v1/public/marketing/recommend/hotAsset/list?currency=USD&type=1`
-    )
+    .get(`${BASE_URL}/${HOT_ASSETS}`)
     .then(async (res) => {
       const trends = await Promise.all(
         res.data.data.map(async (item) => {
           const assets = await axios.get(
-            `https://www.binance.com/bapi/composite/v1/public/marketing/tardingPair/detail?symbol=${item.baseAsset}`
+            `${BASE_URL}/tardingPair/detail?symbol=${item.baseAsset}`
           );
 
           if (assets.data.data[0]) {
@@ -103,7 +104,10 @@ const sendMsg = (msg) => {
 const send = async (trends) => {
   // YOU CAN REPLACE jsonFile WITH trends
   const tickers = jsonFile.filter(
-    (s) => !s.symbol.includes("DOWN") && !s.symbol.includes("UP")
+    (s) =>
+      !s.symbol.includes("DOWN") &&
+      !s.symbol.includes("UP") &&
+      !s.symbol.includes("LUNA")
   );
 
   await Promise.all(
@@ -111,7 +115,7 @@ const send = async (trends) => {
       const ticker = item.symbol;
       const symbol = ticker.split("USDT")[0];
       // SET YOUR INTERVAL
-      const interval = "5m";
+      const interval = process.argv[2];
       setTimeout(async () => {
         const rsiResult = await checkRsi(`${symbol}/USDT`, interval);
         const breakout = await checkBreakout(`${symbol}/USDT`, interval);
@@ -119,6 +123,8 @@ const send = async (trends) => {
         item.rsi = rsiResult;
         item.breakout = breakout;
         let msg;
+        // Breakout Alerts:
+
         if (breakout) {
           msg = `
                        BREAKOUT ALERT! (${interval} interval)
@@ -133,6 +139,8 @@ const send = async (trends) => {
                        `;
           sendMsg(msg);
         }
+
+        // RSI Alerts:
         if (rsiResult.overSold || rsiResult.overBought) {
           console.log({
             breakout: breakout,
